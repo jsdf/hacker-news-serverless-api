@@ -8,15 +8,15 @@ var store = require('./store');
 
 /*::
 
-type ItemType = 'comment' | 'story' | 'poll';
+type ItemType = 'comment' | 'story' | 'poll' | 'job';
 
 type Comment = {
-  by: "miles",
+  by: string,
   id: number,
   parent: number,
   text: string,
   time: number,
-  type: ItemType,
+  type: 'comment',
 };
 
 type StoryData = {
@@ -51,26 +51,28 @@ module.exports.cron = (
 ) => {
   getTopStoryIds()
     .then(ids => Promise.all(ids.map(fetchStory)))
-    .then(stories => {
+    .then((stories /*: Array<StoryData>*/) => {
       var topStories = [];
-      var storyPromises = stories.map(data => {
-        var descendentIds = [];
-        data.comments.forEach(c => {
-          descendentIds.push(c.id);
+      var storyPromises = stories
+        .filter(story => story.story.type === 'story')
+        .map(data => {
+          var descendentIds = [];
+          data.comments.forEach(c => {
+            descendentIds.push(c.id);
+          });
+          var storyRecord = Object.assign({}, data.story, {
+            descendentIds,
+            comments: data.comments,
+          });
+
+          const topStory = Object.assign({}, data.story);
+          delete topStory.kids;
+
+          topStories.push(topStory);
+
+          // write this story
+          return store.put(`stories/${storyRecord.id}`, storyRecord);
         });
-        var storyRecord = Object.assign({}, data.story, {
-          descendentIds,
-          comments: data.comments,
-        });
-
-        const topStory = Object.assign({}, data.story);
-        delete topStory.kids;
-
-        topStories.push(topStory);
-
-        // write this story
-        return store.put(`stories/${storyRecord.id}`, storyRecord);
-      });
 
       return Promise.all(storyPromises).then(() => {
         return store.put('topstories', topStories);

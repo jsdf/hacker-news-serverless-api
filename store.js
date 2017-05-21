@@ -6,7 +6,7 @@ var AWS = require('aws-sdk');
 
 var s3 = new AWS.S3();
 
-var bucket = 'hacker-news-serverless-api';
+var bucket = 'serverless-api.hackernewsmobile.com';
 
 module.exports = {
   put: (key /*: string */, data /*: any */) => {

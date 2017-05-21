@@ -8,6 +8,12 @@ Once you have the top stories IDs you can get individual story data from: `/stor
 eg. https://s3-us-west-2.amazonaws.com/hacker-news-serverless-api/stories/14380625.json
 
 
+### running it yourself
+
+after cloning this repo, run `yarn` to get things started
+
+then:
+
 run it locally
 ```bash
 node runItLocally.js

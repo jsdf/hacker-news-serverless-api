@@ -32,12 +32,28 @@ type StoryData = {
     type: ItemType,
     url: string
   },
+  itemIds: Array<number>,
 };
 
 */
 
-function fetchStory(id /*: number */) /* : Promise<StoryData> */ {
-  return hn.fetchStory(id);
+/*::
+declare function time<T>(promise: Promise<T>, msg: string): Promise<T>;
+*/
+
+function time(promise, msg) {
+  console.time(msg);
+  return promise.then(val => {
+    console.timeEnd(msg);
+    return val;
+  });
+}
+
+function fetchStory(
+  id /*: number */,
+  knownItemIds /*: Array<number>*/
+) /* : Promise<StoryData> */ {
+  return hn.fetchStory(id, knownItemIds);
 }
 
 function getTopStoryIds() /* : Promise<Array<number>> */ {
@@ -49,43 +65,82 @@ module.exports.cron = (
   context /*: Object */,
   callback /*: (err: ?Object, result: ?Object) => void */
 ) => {
-  getTopStoryIds()
-    .then(ids => Promise.all(ids.map(fetchStory)))
-    .then((stories /*: Array<StoryData>*/) => {
-      var topStories = [];
-      var storyPromises = stories
-        .filter(story => story.story.type === 'story')
-        .map(data => {
-          var descendentIds = [];
-          data.comments.forEach(c => {
-            descendentIds.push(c.id);
-          });
-          var storyRecord = Object.assign({}, data.story, {
-            descendentIds,
-            comments: data.comments,
-          });
+  context.callbackWaitsForEmptyEventLoop = false;
+  console.log('starting');
+  var topStoriesLoaded = {};
+  let topStoryIds = [];
+  let idCache = {};
+  store
+    .get('id-cache')
+    .then(idCacheData => {
+      if (idCacheData) {
+        try {
+          idCache = JSON.parse(idCacheData.Body.toString());
+          console.log('warmed id cache');
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    })
+    .then(() => time(getTopStoryIds(), 'getTopStoryIds'))
+    .then(ids => {
+      console.log('got topstory ids');
+      topStoryIds = ids;
+      const storyPromises = topStoryIds.map(id =>
+        time(fetchStory(id, idCache[id]), `fetchStory ${id}`)
+          .then((storyData /*: StoryData*/) => {
+            if (storyData.story.type !== 'story') {
+              return Promise.resolve(null);
+            }
 
-          const topStory = Object.assign({}, data.story);
-          delete topStory.kids;
+            var descendentIds = [];
+            storyData.comments.forEach(c => {
+              descendentIds.push(c.id);
+            });
+            var storyRecord = Object.assign({}, storyData.story, {
+              descendentIds,
+              comments: storyData.comments,
+            });
 
-          topStories.push(topStory);
+            const topStory = Object.assign({}, storyData.story);
+            delete topStory.kids;
 
-          // write this story
-          return store.put(`stories/${storyRecord.id}`, storyRecord);
-        });
+            idCache[id] = storyData.itemIds;
 
-      return Promise.all(storyPromises).then(() => {
-        return store.put('topstories', topStories);
+            topStoriesLoaded[topStory.id] = topStory;
+
+            // write this story
+            return store.put(`stories/${storyRecord.id}`, storyRecord);
+          })
+          .then(() => Promise.resolve(null))
+      );
+      return Promise.all(storyPromises);
+    })
+    .then(() => {
+      console.log('writing top stories');
+      const topStoriesOrdered = topStoryIds
+        .filter(id => topStoriesLoaded[id])
+        .map(id => topStoriesLoaded[id]);
+
+      return Promise.all([
+        store.put('id-cache', idCache),
+        store.put('topstories', topStoriesOrdered),
+        store.put('topstories-25-0', topStoriesOrdered.slice(0, 25)),
+        store.put('topstories-25-1', topStoriesOrdered.slice(25, 50)),
+        store.put('topstories-25-2', topStoriesOrdered.slice(50, 75)),
+        store.put('topstories-25-3', topStoriesOrdered.slice(75, 100)),
+      ]);
+    })
+    .then(() => {
+      console.log('wrote top stories');
+      callback(null, {
+        message: 'function executed successfully!',
       });
     })
     .catch(err => {
+      console.log('got an error');
       callback(err, {
         message: 'fail! ' + err,
-      });
-    })
-    .then(() => {
-      callback(null, {
-        message: 'function executed successfully!',
       });
     });
 };

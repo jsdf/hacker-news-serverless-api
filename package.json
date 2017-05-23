@@ -9,6 +9,6 @@
   "dependencies": {
     "aws-sdk": "^2.54.0",
     "flow-bin": "^0.46.0",
-    "hacker-news-api-client": "^0.1.0"
+    "hacker-news-api-client": "^0.2.0"
   }
 }

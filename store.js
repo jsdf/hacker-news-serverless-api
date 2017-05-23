@@ -25,4 +25,19 @@ module.exports = {
       );
     });
   },
+  get: (key /*: string */) => {
+    return new Promise((resolve, reject) => {
+      s3.getObject(
+        {
+          Bucket: bucket,
+          Key: `${key}.json`,
+        },
+        (err, data) => {
+          if (err && err.code == 'NoSuchKey') return resolve(null);
+          if (err) return reject(err);
+          return resolve(data);
+        }
+      );
+    });
+  },
 };

@@ -4,8 +4,34 @@ service: hacker-news-serverless-api
 provider:
   name: aws
   runtime: nodejs6.10
-  memorySize: 256
-  timeout: 20
+  stage: dev
+  region: us-west-2
+  memorySize: 512
+  timeout: 60
+
+  iamRoleStatements:
+    -  Effect: "Allow"
+       Action:
+         - "s3:ListBucket"
+       Resource:
+         Fn::Join:
+           - ""
+           - - "arn:aws:s3:::"
+             - Ref: ServerlessDeploymentBucket
+    -  Effect: "Allow"
+       Action:
+         - "s3:PutObject"
+       Resource:
+         Fn::Join:
+           - ""
+           - - "arn:aws:s3:::"
+             - Ref: ServerlessDeploymentBucket
+             - "/*"
+    -  Effect: "Allow"
+       Action:
+         - "s3:*"
+       Resource: "arn:aws:s3:::serverless-api.hackernewsmobile.com/*"
+
 
 
 functions:
@@ -13,4 +39,3 @@ functions:
     handler: handler.cron
     events:
       - schedule: rate(30 minutes)
-

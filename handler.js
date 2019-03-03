@@ -6,6 +6,8 @@ var hn = require('hacker-news-api-client');
 
 var store = require('./store');
 
+const DEBUG = false;
+
 /*::
 
 type ItemType = 'comment' | 'story' | 'poll' | 'job';
@@ -42,9 +44,9 @@ declare function time<T>(promise: Promise<T>, msg: string): Promise<T>;
 */
 
 function time(promise, msg) {
-  console.time(msg);
+  DEBUG && console.time(msg);
   return promise.then(val => {
-    console.timeEnd(msg);
+    DEBUG && console.timeEnd(msg);
     return val;
   });
 }
@@ -66,7 +68,7 @@ module.exports.cron = (
   callback /*: (err: ?Object, result: ?Object) => void */
 ) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  console.log('starting');
+  DEBUG && console.log('starting');
   var topStoriesLoaded = {};
   let topStoryIds = [];
   let idCache = {};
@@ -76,15 +78,15 @@ module.exports.cron = (
       if (idCacheData) {
         try {
           idCache = JSON.parse(idCacheData.Body.toString());
-          console.log('warmed id cache');
+          DEBUG && console.log('warmed id cache');
         } catch (err) {
-          console.error(err);
+          DEBUG && console.error(err);
         }
       }
     })
     .then(() => time(getTopStoryIds(), 'getTopStoryIds'))
     .then(ids => {
-      console.log('got topstory ids');
+      DEBUG && console.log('got topstory ids');
       topStoryIds = ids;
       const storyPromises = topStoryIds.map(id =>
         time(fetchStory(id, idCache[id]), `fetchStory ${id}`)
@@ -117,7 +119,7 @@ module.exports.cron = (
       return Promise.all(storyPromises);
     })
     .then(() => {
-      console.log('writing top stories');
+      DEBUG && console.log('writing top stories');
       const topStoriesOrdered = topStoryIds
         .filter(id => topStoriesLoaded[id])
         .map(id => topStoriesLoaded[id]);
@@ -132,13 +134,13 @@ module.exports.cron = (
       ]);
     })
     .then(() => {
-      console.log('wrote top stories');
+      DEBUG && console.log('wrote top stories');
       callback(null, {
         message: 'function executed successfully!',
       });
     })
     .catch(err => {
-      console.log('got an error');
+      DEBUG && console.log('got an error');
       callback(err, {
         message: 'fail! ' + err,
       });
